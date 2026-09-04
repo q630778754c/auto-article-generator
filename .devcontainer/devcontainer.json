@@ -1,13 +1,15 @@
 {
   "image": "mcr.microsoft.com/devcontainers/python:3.11",
   "postCreateCommand": "pip install -r backend/requirements.txt",
+  "postStartCommand": "bash /workspaces/auto-article-generator/startup.sh",
   "forwardPorts": [
     8000
   ],
   "portsAttributes": {
     "8000": {
       "label": "Backend API",
-      "onAutoForward": "openBrowser"
+      "onAutoForward": "openBrowser",
+      "visibility": "public"
     }
   }
 }
