@@ -1,0 +1,5 @@
+# 可选依赖（ADR-013）：复杂网页栏目采集与 Cookie 型平台发布兜底
+# 安装：pip install -r requirements-extras.txt
+# 说明：不安装也能运行系统，仅缺失 Playwright 兜底发布与 Scrapling 反爬采集能力
+scrapling==0.3.5
+playwright==1.50.0
