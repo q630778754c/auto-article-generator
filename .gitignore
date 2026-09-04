@@ -1,0 +1,32 @@
+# 运行时数据（自动创建）
+data/
+backend/app/static/
+!backend/app/static/.gitkeep
+
+# 密钥与凭证
+*.secret_key
+.secret_key
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# 前端
+backend/web/node_modules/
+backend/web/dist/
+
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+# 部署凭证
+deploy-credentials.env
+../deploy-credentials.env
