@@ -1,0 +1,64 @@
+name: Deploy Frontend to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/web/**"
+      - ".github/workflows/deploy-frontend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: backend/web/package-lock.json
+
+      - name: 构建前端
+        working-directory: backend/web
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_BUILD_VERSION: ${{ github.sha }}
+          VITE_BUILD_TIME: ${{ github.event.head_commit.timestamp }}
+        run: |
+          npm ci
+          npm run build
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: backend/app/static
+          retention-days: 7
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.deployment-url }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: dist
+
+      - name: 部署到 Pages
+        id: deploy
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: auto-article-web
+          directory: dist
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
