@@ -1,0 +1,14 @@
+# Cloudflare Pages 路由规则（task 9.2）
+#
+# 部署时把 _redirects 与 _headers 一并上传到 Pages 项目根目录
+# 优先放置于 backend/web/public/，构建时会被 Vite 拷贝到 outDir (../app/static)
+#
+# 路由策略：
+# 1) /api/* 走 Workers / Render 反向代理（占位：改为你自己的代理域名）
+# 2) 所有 SPA 路径 fallback 到 /index.html
+
+# Render 后端反向代理（CORS 安全且无需暴露 Render 域名）
+/api/*  https://auto-article-generator.onrender.com/api/:splat  200
+
+# SPA 路由 fallback
+/*      /index.html                                                   200
