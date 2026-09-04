@@ -1,0 +1,33 @@
+name: Keep Render Alive
+
+on:
+  schedule:
+    # 每 14 分钟（Render 免费实例 15 分钟无请求会休眠）
+    - cron: "*/14 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoint
+        env:
+          APP_URL: ${{ vars.RENDER_APP_URL }}
+        run: |
+          if [ -z "${APP_URL}" ]; then
+            echo "::warning::RENDER_APP_URL not configured, skip"
+            exit 0
+          fi
+          URL="${APP_URL%/}/api/v1/health"
+          echo "pinging ${URL}"
+          HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 30 "${URL}" || echo "000")
+          echo "HTTP ${HTTP_CODE}"
+          if [[ ! "${HTTP_CODE}" =~ ^2 ]]; then
+            echo "::warning::health check returned non-2xx: ${HTTP_CODE}"
+            exit 1
+          fi
+          curl -sS "${URL}" | head -c 500
+          echo ""
