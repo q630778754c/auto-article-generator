@@ -1,0 +1,21 @@
+# Cloudflare Pages 项目配置（task 9.4）
+# 本文件用于 wrangler pages deploy；CI 部署（GitHub Actions）可省略
+
+name = "auto-article-web"
+compatibility_date = "2024-09-01"
+pages_build_output_dir = "../app/static"
+
+[vars]
+# 构建时注入的 API 基础地址（最终用户浏览器调用的后端入口）
+# 如使用 _redirects 代理 /api → Render，则可留空
+VITE_API_BASE_URL = ""
+
+[build]
+command = "npm run build"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
