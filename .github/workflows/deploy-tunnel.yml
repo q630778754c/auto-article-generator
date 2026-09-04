@@ -3,6 +3,9 @@ name: Deploy Backend (Tunnel)
 on:
   push:
     branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-tunnel.yml'
   workflow_dispatch:
   schedule:
     - cron: '0 */5 * * *'
@@ -29,10 +32,11 @@ jobs:
           pip install -r backend/requirements.txt
           npm install -g localtunnel
 
-      - name: Start server
+      - name: Deploy server and tunnel
         run: |
           mkdir -p /tmp/data/images /tmp/data/logs
           cd backend
+
           export DATA_DIR=/tmp/data
           export STORAGE_BACKEND=local
           export APP_HOST=0.0.0.0
@@ -43,18 +47,50 @@ jobs:
           export LLM_API_KEY=${{ secrets.LLM_API_KEY }}
           export LLM_BASE_URL=https://integrate.api.nvidia.com/v1
           export LLM_MODEL=meta/llama-3.1-405b-instruct
-          export BUILD_VERSION=github-action-v1
-          nohup python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/server.log 2>&1 &
-          sleep 5
-          cat /tmp/server.log
+          export BUILD_VERSION=github-action-v2
 
-      - name: Start tunnel and keep alive
-        run: |
+          echo "Starting server..."
+          nohup python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/server.log 2>&1 &
+
+          echo "Waiting for server to be ready..."
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:8000/api/v1/health | grep -q healthy; then
+              echo "Server is ready!"
+              break
+            fi
+            echo "  Attempt $i: $(cat /tmp/server.log | tail -1)"
+            sleep 2
+          done
+
+          echo "Server health: $(curl -s http://localhost:8000/api/v1/health)"
+          echo "Frontend check: $(curl -s http://localhost:8000/ | head -c 100)"
+
+          echo "Starting localtunnel..."
           lt --port 8000 --subdomain aag-api > /tmp/tunnel.log 2>&1 &
           sleep 10
           cat /tmp/tunnel.log
-          echo "Tunnel started at: $(date)"
+
+          echo "Testing tunnel..."
+          for i in $(seq 1 10); do
+            TUNNEL_RESP=$(curl -s -o /dev/null -w "%{http_code}" https://aag-api.loca.lt/api/v1/health 2>/dev/null || echo "000")
+            echo "  Tunnel attempt $i: HTTP $TUNNEL_RESP"
+            if [ "$TUNNEL_RESP" = "200" ]; then
+              echo "Tunnel is working!"
+              break
+            fi
+            sleep 5
+          done
+
+          echo "=== Deployment active at $(date) ==="
+          echo "Keep alive..."
           for i in $(seq 1 170); do
             sleep 60
-            echo "Alive at: $(date) - $(curl -s http://localhost:8000/api/v1/health | head -c 100)"
+            HEALTH=$(curl -s http://localhost:8000/api/v1/health 2>/dev/null | head -c 100)
+            echo "Alive at $(date): $HEALTH"
+            if ! echo "$HEALTH" | grep -q healthy; then
+              echo "Server down! Restarting..."
+              cd backend
+              nohup python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/server.log 2>&1 &
+              sleep 5
+            fi
           done
