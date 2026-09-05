@@ -2,7 +2,8 @@
 
 from fastapi import APIRouter
 
-from app.api.v1 import auth, sources, channels, config, pipeline, articles, alerts, metrics, health
+from app.api.v1 import auth, sources, channels, config, pipeline, articles, alerts, metrics, health, apikeys
+from app.api.v1.open import router as open_router
 
 router = APIRouter(prefix="/api/v1")
 router.include_router(auth.router, prefix="/auth", tags=["认证"])
@@ -13,4 +14,6 @@ router.include_router(pipeline.router, prefix="/pipeline", tags=["流水线"])
 router.include_router(articles.router, prefix="/articles", tags=["文章"])
 router.include_router(alerts.router, prefix="/alerts", tags=["告警"])
 router.include_router(metrics.router, prefix="/metrics", tags=["监控"])
+router.include_router(apikeys.router, prefix="/apikeys", tags=["API Key"])
 router.include_router(health.router, prefix="", tags=["健康检查"])
+router.include_router(open_router, prefix="/open", tags=["开放API"])
