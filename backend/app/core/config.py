@@ -198,6 +198,10 @@ _DEFAULT_RUNTIME: dict[str, str] = {
     "alert.enabled": "true",
     "alert.wechat_webhook": "",
     "alert.smtp_enabled": "false",
+    "api_key_config.default_rate_limit": "100",
+    "api_key_config.default_expires_days": "90",
+    "api_key_config.max_concurrent": "5",
+    "api_key_config.max_limit_per_request": "100",
 }
 
 # 运行层配置范围校验：key -> (min, max)，None 表示不限（design 2.7.2）
@@ -216,6 +220,10 @@ _RANGE_RULES: dict[str, tuple[float | None, float | None]] = {
     "pipeline_strategy.quality_threshold": (0, 100),
     "pipeline_strategy.image_text_threshold": (0, 1),
     "pipeline_strategy.max_rewrite_times": (0, 2),
+    "api_key_config.default_rate_limit": (1, 1000),
+    "api_key_config.default_expires_days": (1, 365),
+    "api_key_config.max_concurrent": (1, 20),
+    "api_key_config.max_limit_per_request": (1, 500),
 }
 
 BOUNDS = {k: (int(lo), int(hi)) for k, (lo, hi) in _RANGE_RULES.items()}
@@ -257,7 +265,15 @@ def _load_defaults_to_db(session) -> int:
     for key, value in _DEFAULT_RUNTIME.items():
         if key in existing:
             continue
-        session.add(SystemConfig(config_key=key, config_value=value, version=1))
+        category = key.split(".", 1)[0]
+        session.add(SystemConfig(
+            config_key=key,
+            config_value=value,
+            category=category,
+            version=1,
+            updated_by="system",
+            updated_at="",
+        ))
         added += 1
     if added:
         session.flush()
