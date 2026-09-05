@@ -16,8 +16,8 @@ from app.core.exceptions import UnifiedPlatformError
 
 logger = logging.getLogger(__name__)
 
-_CONNECT_TIMEOUT = 3.0
-_READ_TIMEOUT = 5.0
+_CONNECT_TIMEOUT = 10.0
+_READ_TIMEOUT = 15.0
 
 
 class UnifiedPlatformClient:
@@ -30,6 +30,7 @@ class UnifiedPlatformClient:
         self._app_secret = s.unified_platform_app_secret
         if not self._base_url.startswith("https://"):
             raise UnifiedPlatformError(f"统一平台 base_url 必须为 HTTPS：{self._base_url}")
+        logger.info("unified_platform init base_url=%s app_id=%s app_secret=%s", self._base_url, "SET" if self._app_id else "EMPTY", "SET" if self._app_secret else "EMPTY")
         self._client: httpx.AsyncClient | None = None
 
     async def _get_client(self) -> httpx.AsyncClient:
@@ -56,7 +57,9 @@ class UnifiedPlatformClient:
         elapsed_ms = int((time.monotonic() - start) * 1000)
         logger.info("unified_platform POST %s status=%d elapsed=%dms", path, resp.status_code, elapsed_ms)
         if resp.status_code != 200:
-            raise UnifiedPlatformError(f"统一平台返回非 200：{resp.status_code}")
+            body_preview = resp.text[:500]
+            logger.error("unified_platform POST %s status=%d body=%s app_id=%s", path, resp.status_code, body_preview, "SET" if self._app_id else "EMPTY")
+            raise UnifiedPlatformError(f"统一平台返回非 200：{resp.status_code}，详情：{body_preview}")
         data = resp.json()
         if not isinstance(data, dict):
             raise UnifiedPlatformError("统一平台响应格式异常")
@@ -80,7 +83,9 @@ class UnifiedPlatformClient:
         elapsed_ms = int((time.monotonic() - start) * 1000)
         logger.info("unified_platform GET %s status=%d elapsed=%dms", path, resp.status_code, elapsed_ms)
         if resp.status_code != 200:
-            raise UnifiedPlatformError(f"统一平台返回非 200：{resp.status_code}")
+            body_preview = resp.text[:500]
+            logger.error("unified_platform GET %s status=%d body=%s app_id=%s", path, resp.status_code, body_preview, "SET" if self._app_id else "EMPTY")
+            raise UnifiedPlatformError(f"统一平台返回非 200：{resp.status_code}，详情：{body_preview}")
         data = resp.json()
         if not isinstance(data, dict):
             raise UnifiedPlatformError("统一平台响应格式异常")
