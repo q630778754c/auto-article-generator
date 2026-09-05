@@ -2,41 +2,38 @@ name: Deploy Backend (Tunnel)
 
 on:
   push:
-    branches: [main]
-    paths:
-      - 'backend/**'
-      - '.github/workflows/deploy-tunnel.yml'
+    branches: [ main ]
   workflow_dispatch:
-  schedule:
-    - cron: '0 */5 * * *'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 290
     steps:
       - uses: actions/checkout@v4
-
+      
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
+      
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-
+      
       - name: Install dependencies
         run: |
           pip install -r backend/requirements.txt
-          npm install -g localtunnel
-
+          cd backend/web && npm install
+      
+      - name: Build frontend
+        run: |
+          cd backend/web
+          npm run build
+      
       - name: Deploy server and tunnel
         run: |
-          mkdir -p /tmp/data/images /tmp/data/logs
-          cd backend
-
+          set -e
           export DATA_DIR=/tmp/data
           export STORAGE_BACKEND=local
           export APP_HOST=0.0.0.0
@@ -47,26 +44,28 @@ jobs:
           export LLM_API_KEY=${{ secrets.LLM_API_KEY }}
           export LLM_BASE_URL=https://integrate.api.nvidia.com/v1
           export LLM_MODEL=meta/llama-3.1-405b-instruct
-          export BUILD_VERSION=github-action-v6
+          export BUILD_VERSION=github-action-v7
           export CORS_ALLOWED_ORIGINS=*
           export UNIFIED_PLATFORM_BASE_URL=https://unified-auth-admin.pages.dev/api
           export UNIFIED_PLATFORM_APP_ID=${{ secrets.UNIFIED_PLATFORM_APP_ID }}
           export UNIFIED_PLATFORM_APP_SECRET=${{ secrets.UNIFIED_PLATFORM_APP_SECRET }}
-
+          
           echo "Starting server..."
+          cd backend
           nohup python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/server.log 2>&1 &
-
+          
           for i in $(seq 1 30); do
-            if curl -s http://localhost:8000/api/v1/health | grep -q healthy; then
+            if curl -s http://localhost:8000/api/v1/health 2>/dev/null | grep -q healthy; then
               echo "Server ready!"
               break
             fi
             sleep 2
           done
-
+          
+          cd ..
           lt --port 8000 --subdomain aag-api > /tmp/tunnel.log 2>&1 &
           sleep 10
-
+          
           for i in $(seq 1 10); do
             CODE=$(curl -s -o /dev/null -w "%{http_code}" https://aag-api.loca.lt/api/v1/health 2>/dev/null || echo "000")
             if [ "$CODE" = "200" ]; then
@@ -75,7 +74,7 @@ jobs:
             fi
             sleep 5
           done
-
+          
           echo "=== Active at $(date) ==="
           for i in $(seq 1 170); do
             sleep 60
@@ -86,5 +85,6 @@ jobs:
               cd backend
               nohup python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/server.log 2>&1 &
               sleep 5
+              cd ..
             fi
           done
