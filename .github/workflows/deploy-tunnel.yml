@@ -22,15 +22,11 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
       - name: Install dependencies
         run: |
           pip install -r backend/requirements.txt
-          npm install -g localtunnel
+          wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -O /usr/local/bin/cloudflared
+          chmod +x /usr/local/bin/cloudflared
 
       - name: Deploy server and tunnel
         run: |
@@ -47,10 +43,10 @@ jobs:
           export LLM_API_KEY=${{ secrets.LLM_API_KEY }}
           export LLM_BASE_URL=https://integrate.api.nvidia.com/v1
           export LLM_MODEL=meta/llama-3.1-405b-instruct
-          export BUILD_VERSION=github-action-v3
-          export CORS_ALLOWED_ORIGINS=https://aag-api.loca.lt
+          export BUILD_VERSION=github-action-v4
+          export CORS_ALLOWED_ORIGINS=*
 
-          echo "Starting server (local storage)..."
+          echo "Starting server..."
           nohup python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/server.log 2>&1 &
 
           for i in $(seq 1 30); do
@@ -58,26 +54,36 @@ jobs:
               echo "Server ready!"
               break
             fi
-            echo "  Attempt $i: $(cat /tmp/server.log | tail -1)"
             sleep 2
           done
 
           echo "Health: $(curl -s http://localhost:8000/api/v1/health)"
 
-          lt --port 8000 --subdomain aag-api > /tmp/tunnel.log 2>&1 &
-          sleep 10
-          cat /tmp/tunnel.log
+          echo "Starting cloudflared tunnel..."
+          cloudflared tunnel --url http://localhost:8000 > /tmp/tunnel.log 2>&1 &
+          sleep 15
 
-          for i in $(seq 1 10); do
-            CODE=$(curl -s -o /dev/null -w "%{http_code}" https://aag-api.loca.lt/api/v1/health 2>/dev/null || echo "000")
-            if [ "$CODE" = "200" ]; then
-              echo "Tunnel OK!"
-              break
-            fi
-            sleep 5
-          done
+          TUNNEL_URL=$(grep -oP 'https://[a-z0-9-]+\.trycloudflare\.com' /tmp/tunnel.log | head -1)
+          echo "Tunnel URL: $TUNNEL_URL"
+
+          if [ -n "$TUNNEL_URL" ]; then
+            echo "Testing tunnel..."
+            for i in $(seq 1 10); do
+              CODE=$(curl -s -o /dev/null -w "%{http_code}" "$TUNNEL_URL/api/v1/health" 2>/dev/null || echo "000")
+              echo "  Attempt $i: HTTP $CODE"
+              if [ "$CODE" = "200" ]; then
+                echo "Tunnel working!"
+                break
+              fi
+              sleep 5
+            done
+
+            # Write URL to a GitHub Gist for discovery
+            curl -s -X PATCH               -H "Authorization: token ${{ secrets.GH_TOKEN }}"               -H "Content-Type: application/json"               -d "{\"description\":\"AAG Deploy URL\",\"files\":{\"url.txt\":{\"content\":\"$TUNNEL_URL\"}}}"               https://api.github.com/gists/aag-deploy-url > /dev/null 2>&1 ||             curl -s -X POST               -H "Authorization: token ${{ secrets.GH_TOKEN }}"               -H "Content-Type: application/json"               -d "{\"description\":\"AAG Deploy URL\",\"public\":true,\"files\":{\"url.txt\":{\"content\":\"$TUNNEL_URL\"}}}"               https://api.github.com/gists > /dev/null 2>&1
+          fi
 
           echo "=== Active at $(date) ==="
+          echo "URL: $TUNNEL_URL"
           for i in $(seq 1 170); do
             sleep 60
             HEALTH=$(curl -s http://localhost:8000/api/v1/health 2>/dev/null | head -c 100)
