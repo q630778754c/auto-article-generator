@@ -12,6 +12,7 @@ from app.models.system import (
 from app.models.v3_stats import (
     SlaSample, ReviewQualityDaily, UnmannedRunStat, SpotCheckSample,
 )
+from app.models.api_key import ApiKey, ApiKeyCallLog
 
 __all__ = [
     "UserAccount",
@@ -22,4 +23,5 @@ __all__ = [
     "SystemConfig", "AlertEvent", "AuditLog", "ProcessLog",
     "MetricsDaily", "QuotaUsage",
     "SlaSample", "ReviewQualityDaily", "UnmannedRunStat", "SpotCheckSample",
+    "ApiKey", "ApiKeyCallLog",
 ]
