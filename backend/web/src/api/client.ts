@@ -48,13 +48,22 @@ client.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('username');
+      localStorage.removeItem('token_type');
+      localStorage.removeItem('email');
       if (!window.location.pathname.startsWith('/login')) {
         window.location.href = '/login';
       }
     }
-    const msg = error.response?.data?.message || error.message || '网络异常';
-    if (error.response?.status !== 401) {
+    if (error.response?.status === 503) {
+      message.error('认证服务暂时不可用，请稍后重试');
+    } else if (error.response?.status === 429) {
+      const msg = error.response?.data?.message || '请求过于频繁，请稍后重试';
       message.error(msg);
+    } else {
+      const msg = error.response?.data?.message || error.message || '网络异常';
+      if (error.response?.status !== 401) {
+        message.error(msg);
+      }
     }
     return Promise.reject(error);
   }
