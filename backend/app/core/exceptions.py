@@ -112,3 +112,46 @@ class CredentialEmptyError(ParamError):
 class PlatformUnsupportedError(ParamError):
     def __init__(self, platform: str):
         super().__init__(f"暂不支持的平台：{platform}", 2004)
+
+
+class UnifiedPlatformError(AppException):
+    """统一平台调用失败/超时/不可用（spec 4.3.2）。"""
+
+    def __init__(self, message: str = "统一平台服务不可用，请稍后重试", code: int = 6003, http_status: int = 503):
+        super().__init__(code, message, http_status)
+
+
+class ApiKeyInvalidError(AuthError):
+    """API Key 无效/不存在（spec 4.3.4）。"""
+
+    def __init__(self, message: str = "API Key 无效"):
+        super().__init__(message, 1003, 401)
+
+
+class ApiKeyExpiredError(AuthError):
+    """API Key 已过期（spec 4.3.4）。"""
+
+    def __init__(self, message: str = "API Key 已过期"):
+        super().__init__(message, 1004, 401)
+
+
+class ApiKeyDisabledError(AuthError):
+    """API Key 已被禁用（spec 4.3.4）。"""
+
+    def __init__(self, message: str = "API Key 已被禁用"):
+        super().__init__(message, 1005, 401)
+
+
+class RateLimitError(AppException):
+    """速率限制/并发超限（spec 4.3.4），携带 retry_after 字段。"""
+
+    def __init__(self, message: str = "请求过于频繁，请稍后重试", retry_after: int = 60):
+        super().__init__(6004, message, 429, data={"retry_after": retry_after})
+        self.retry_after = retry_after
+
+
+class PermissionDeniedError(AppException):
+    """权限范围不足（spec 4.3.3）。"""
+
+    def __init__(self, message: str = "权限不足，无法执行此操作"):
+        super().__init__(1006, message, 403)
