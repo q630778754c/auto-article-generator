@@ -22,8 +22,15 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Install dependencies
-        run: pip install -r backend/requirements.txt
+        run: |
+          pip install -r backend/requirements.txt
+          npm install -g localtunnel
 
       - name: Deploy server and tunnel
         run: |
@@ -54,41 +61,19 @@ jobs:
             sleep 2
           done
 
-          echo "Health: $(curl -s http://localhost:8000/api/v1/health)"
+          lt --port 8000 --subdomain aag-api > /tmp/tunnel.log 2>&1 &
+          sleep 10
 
-          echo "Starting SSH tunnel (localhost.run)..."
-          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -R 80:localhost:8000 nokey@localhost.run > /tmp/tunnel.log 2>&1 &
-          sleep 15
-          cat /tmp/tunnel.log
-
-          TUNNEL_URL=$(grep -oP 'https://[a-z0-9-]+\.[a-z]+\.[a-z]+' /tmp/tunnel.log | head -1)
-          echo "Tunnel URL: $TUNNEL_URL"
-
-          if [ -n "$TUNNEL_URL" ]; then
-            for i in $(seq 1 10); do
-              CODE=$(curl -s -o /dev/null -w "%{http_code}" "$TUNNEL_URL/api/v1/health" 2>/dev/null || echo "000")
-              echo "  Test $i: HTTP $CODE"
-              if [ "$CODE" = "200" ]; then
-                echo "Tunnel working!"
-                break
-              fi
-              sleep 5
-            done
-
-            curl -s -X PATCH \
-              -H "Authorization: token ${{ secrets.GH_TOKEN }}" \
-              -H "Content-Type: application/json" \
-              -d "{\"description\":\"AAG Deploy URL\",\"files\":{\"url.txt\":{\"content\":\"$TUNNEL_URL\"}}}" \
-              https://api.github.com/gists/aag-deploy-url > /dev/null 2>&1 || \
-            curl -s -X POST \
-              -H "Authorization: token ${{ secrets.GH_TOKEN }}" \
-              -H "Content-Type: application/json" \
-              -d "{\"description\":\"AAG Deploy URL\",\"public\":true,\"files\":{\"url.txt\":{\"content\":\"$TUNNEL_URL\"}}}" \
-              https://api.github.com/gists > /dev/null 2>&1
-          fi
+          for i in $(seq 1 10); do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" https://aag-api.loca.lt/api/v1/health 2>/dev/null || echo "000")
+            if [ "$CODE" = "200" ]; then
+              echo "Tunnel OK!"
+              break
+            fi
+            sleep 5
+          done
 
           echo "=== Active at $(date) ==="
-          echo "URL: $TUNNEL_URL"
           for i in $(seq 1 170); do
             sleep 60
             HEALTH=$(curl -s http://localhost:8000/api/v1/health 2>/dev/null | head -c 100)
