@@ -93,10 +93,16 @@ class UnifiedPlatformClient:
 
     @staticmethod
     def _check_success(data: dict[str, Any]) -> dict[str, Any]:
-        if data.get("code") not in (0, 200, "0", "200"):
-            msg = data.get("message", "统一平台操作失败")
-            raise UnifiedPlatformError(msg)
-        return data.get("data", data)
+        code = data.get("code")
+        success = data.get("success")
+        msg = data.get("message", "")
+        if code in (0, 200, "0", "200"):
+            return data.get("data", data)
+        if success is True:
+            return data.get("data", data)
+        if "成功" in msg or "success" in msg.lower() or "ok" == msg.lower():
+            return data.get("data", data)
+        raise UnifiedPlatformError(msg or "统一平台操作失败")
 
     async def send_code(self, email: str) -> dict[str, Any]:
         data = await self._post("/send-code", {"email": email})
