@@ -11,6 +11,7 @@ const menuItems = [
   { key: '/publish-records', label: '发布记录' },
   { key: '/channels', label: '账号渠道' },
   { key: '/config', label: '系统配置' },
+  { key: '/apikeys', label: 'API Key 管理' },
   { key: '/alerts', label: '告警中心' },
   { key: '/spot-check', label: '审核质量抽查' },
   { key: '/unmanned-report', label: '无人值守验收' },
