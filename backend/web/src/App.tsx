@@ -9,6 +9,7 @@ import Config from './pages/config';
 import Alerts from './pages/alerts';
 import SpotCheck from './pages/spot-check';
 import UnmannedReport from './pages/unmanned-report';
+import ApiKeys from './pages/apikeys';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAppStore((s) => !!s.token);
@@ -33,6 +34,7 @@ export default function App() {
         <Route path="publish-records" element={<PublishRecords />} />
         <Route path="channels" element={<Channels />} />
         <Route path="config" element={<Config />} />
+        <Route path="apikeys" element={<ApiKeys />} />
         <Route path="alerts" element={<Alerts />} />
         <Route path="spot-check" element={<SpotCheck />} />
         <Route path="unmanned-report" element={<UnmannedReport />} />
