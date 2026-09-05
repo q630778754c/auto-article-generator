@@ -47,8 +47,11 @@ jobs:
           export LLM_API_KEY=${{ secrets.LLM_API_KEY }}
           export LLM_BASE_URL=https://integrate.api.nvidia.com/v1
           export LLM_MODEL=meta/llama-3.1-405b-instruct
-          export BUILD_VERSION=github-action-v5
+          export BUILD_VERSION=github-action-v6
           export CORS_ALLOWED_ORIGINS=*
+          export UNIFIED_PLATFORM_BASE_URL=https://unified-auth-admin.pages.dev/api
+          export UNIFIED_PLATFORM_APP_ID=${{ secrets.UNIFIED_PLATFORM_APP_ID }}
+          export UNIFIED_PLATFORM_APP_SECRET=${{ secrets.UNIFIED_PLATFORM_APP_SECRET }}
 
           echo "Starting server..."
           nohup python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/server.log 2>&1 &
