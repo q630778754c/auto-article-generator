@@ -164,6 +164,8 @@ console.log(await resp.json());
 | 504 | 抓取超时（30s）| 目标站点响应过慢，稍后重试 |
 """
 
+_HTML_MD_ESCAPED = _MARKDOWN.replace("`", "\\`")
+
 _HTML = f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -185,7 +187,7 @@ pre {{ padding: 12px; overflow-x: auto; }} .version {{ color: #999; }}
 <div id="content"></div>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
-const md = `{_MARKDOWN.replace("`", "\\`")}`;
+const md = `{_HTML_MD_ESCAPED}`;
 document.getElementById('content').innerHTML = marked.parse(md);
 </script>
 </body>
