@@ -127,6 +127,15 @@ async def lifespan(app: FastAPI):
 
     await _restore_pipeline()
     await _start_scheduler()
+
+    from app.core.token_cache import get_token_cache
+    from app.core.api_key_limiter import get_api_key_limiter
+    get_token_cache()
+    get_api_key_limiter()
+
+    if settings.unified_platform_base_url and not settings.unified_platform_base_url.startswith("https://"):
+        logger.warning(f"统一平台 base_url 非 HTTPS：{settings.unified_platform_base_url}")
+
     logger.info("启动完成")
     yield
     logger.info("已关闭")
