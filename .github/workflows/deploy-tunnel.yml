@@ -46,6 +46,7 @@ jobs:
           export APP_PORT=8000
           export LOG_LEVEL=INFO
           export ADMIN_USERNAME=admin
+          export ADMIN_PASSWORD=admin123
           export LLM_PROVIDER=openai
           export LLM_API_KEY=${{ secrets.LLM_API_KEY }}
           export LLM_BASE_URL=https://integrate.api.nvidia.com/v1
