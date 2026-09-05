@@ -133,12 +133,68 @@ export interface SystemConfig {
   updated_at: string;
 }
 
+export interface ApiKey {
+  id: number;
+  name: string;
+  key_masked: string;
+  scope: string;
+  rate_limit: number;
+  expires_days: number | null;
+  expires_at: string | null;
+  enabled: boolean;
+  created_by: string;
+  total_calls: number;
+  success_calls: number;
+  fail_calls: number;
+  last_used_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export const api = {
   auth: {
     login: (username: string, password: string) =>
       client.post<ApiResponse<{ token: string; username: string }>>('/auth/login', { username, password }),
     logout: () => client.post<ApiResponse>('/auth/logout'),
     me: () => client.get<ApiResponse<{ username: string }>>('/auth/me'),
+    sendCode: (email: string) =>
+      client.post<ApiResponse>('/auth/send-code', { email }),
+    register: (data: { email: string; code: string; password: string; nickname?: string }) =>
+      client.post<ApiResponse<{ token: string; user: any }>>('/auth/register', data),
+    verifyLogin: (email: string, code: string) =>
+      client.post<ApiResponse<{ token: string; user: any; is_new_user: boolean }>>('/auth/verify-login', { email, code }),
+    resetPassword: (data: { email: string; code: string; new_password: string }) =>
+      client.post<ApiResponse>('/auth/reset-password', data),
+    platformLogin: (email: string, password: string) =>
+      client.post<ApiResponse<{ token: string; user: any }>>('/auth/platform-login', { email, password }),
+  },
+  adminUsers: {
+    list: (keyword = '', page = 1, page_size = 20) =>
+      client.get<ApiResponse>('/auth/admin/users', { params: { keyword, page, page_size } }),
+    get: (user_id: string) =>
+      client.get<ApiResponse>(`/auth/admin/users/${user_id}`),
+    update: (user_id: string, data: { nickname?: string; status?: string }) =>
+      client.put<ApiResponse>(`/auth/admin/users/${user_id}`, data),
+    toggle: (user_id: string) =>
+      client.post<ApiResponse>(`/auth/admin/users/${user_id}/toggle`),
+    unbind: (user_id: string) =>
+      client.delete<ApiResponse>(`/auth/admin/users/${user_id}/unbind`),
+  },
+  apikeys: {
+    list: (page = 1, page_size = 20) =>
+      client.get<ApiResponse<PageData<ApiKey>>>('/apikeys', { params: { page, page_size } }),
+    create: (data: { name: string; scope: string; rate_limit?: number; expires_days?: number | null }) =>
+      client.post<ApiResponse<ApiKey & { key: string }>>('/apikeys', data),
+    get: (id: number) =>
+      client.get<ApiResponse<ApiKey>>(`/apikeys/${id}`),
+    update: (id: number, data: { name?: string; scope?: string; rate_limit?: number; expires_days?: number | null }) =>
+      client.put<ApiResponse<ApiKey>>(`/apikeys/${id}`, data),
+    toggle: (id: number) =>
+      client.post<ApiResponse<ApiKey>>(`/apikeys/${id}/toggle`),
+    delete: (id: number) =>
+      client.delete<ApiResponse>(`/apikeys/${id}`),
+    usage: (id: number) =>
+      client.get<ApiResponse<{ total_calls: number; success_calls: number; fail_calls: number; last_used_at: string | null }>>(`/apikeys/${id}/usage`),
   },
   sources: {
     list: (page = 1, page_size = 20) =>
