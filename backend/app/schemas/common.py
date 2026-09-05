@@ -62,3 +62,35 @@ class MaskedCredentialMixin(BaseModel):
     @field_serializer("credential_cipher")
     def _mask_credential(self, v: str) -> str:
         return mask_sensitive_value(v)
+
+
+class SendCodeRequest(BaseModel):
+    email: str
+
+
+class RegisterRequest(BaseModel):
+    email: str
+    code: str
+    password: str
+    nickname: str = ""
+
+
+class VerifyLoginRequest(BaseModel):
+    email: str
+    code: str
+
+
+class ResetPasswordRequest(BaseModel):
+    email: str
+    code: str
+    new_password: str
+
+
+class PlatformLoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class UpdateUserRequest(BaseModel):
+    nickname: str | None = None
+    status: str | None = None
