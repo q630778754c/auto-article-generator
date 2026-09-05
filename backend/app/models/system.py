@@ -21,7 +21,7 @@ class SystemConfig(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "category IN ('collect_source','ai_service','pipeline_strategy','publish_rule')",
+            "category IN ('collect_source','ai_service','pipeline_strategy','publish_rule','unified_platform','api_key_config')",
             name="ck_config_category",
         ),
     )
