@@ -38,12 +38,7 @@ jobs:
           cd backend
 
           export DATA_DIR=/tmp/data
-          export STORAGE_BACKEND=bitiful
-          export BITIFUL_ENDPOINT=https://q6307788754.s3.bitiful.net
-          export BITIFUL_ACCESS_KEY=${{ secrets.BITIFUL_ACCESS_KEY }}
-          export BITIFUL_SECRET_KEY=${{ secrets.BITIFUL_SECRET_KEY }}
-          export BITIFUL_BUCKET=Q6307788754
-          export BITIFUL_PUBLIC_BASE=https://q6307788754.s3.bitiful.net
+          export STORAGE_BACKEND=local
           export APP_HOST=0.0.0.0
           export APP_PORT=8000
           export LOG_LEVEL=INFO
@@ -55,10 +50,9 @@ jobs:
           export BUILD_VERSION=github-action-v3
           export CORS_ALLOWED_ORIGINS=https://aag-api.loca.lt
 
-          echo "Starting server with Bitiful storage..."
+          echo "Starting server (local storage)..."
           nohup python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/server.log 2>&1 &
 
-          echo "Waiting for server..."
           for i in $(seq 1 30); do
             if curl -s http://localhost:8000/api/v1/health | grep -q healthy; then
               echo "Server ready!"
@@ -69,31 +63,27 @@ jobs:
           done
 
           echo "Health: $(curl -s http://localhost:8000/api/v1/health)"
-          echo "Frontend: $(curl -s http://localhost:8000/ | head -c 100)"
 
-          echo "Starting localtunnel..."
           lt --port 8000 --subdomain aag-api > /tmp/tunnel.log 2>&1 &
           sleep 10
           cat /tmp/tunnel.log
 
-          echo "Testing tunnel..."
           for i in $(seq 1 10); do
             CODE=$(curl -s -o /dev/null -w "%{http_code}" https://aag-api.loca.lt/api/v1/health 2>/dev/null || echo "000")
-            echo "  Tunnel attempt $i: HTTP $CODE"
             if [ "$CODE" = "200" ]; then
-              echo "Tunnel working!"
+              echo "Tunnel OK!"
               break
             fi
             sleep 5
           done
 
-          echo "=== Deployment active at $(date) ==="
+          echo "=== Active at $(date) ==="
           for i in $(seq 1 170); do
             sleep 60
             HEALTH=$(curl -s http://localhost:8000/api/v1/health 2>/dev/null | head -c 100)
-            echo "Alive at $(date): $HEALTH"
+            echo "Alive $(date): $HEALTH"
             if ! echo "$HEALTH" | grep -q healthy; then
-              echo "Server down! Restarting..."
+              echo "Restarting..."
               cd backend
               nohup python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/server.log 2>&1 &
               sleep 5
