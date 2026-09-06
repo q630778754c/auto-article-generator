@@ -14,7 +14,7 @@ from app.api.deps import get_current_user, require_admin
 from app.core.security import verify_password, hash_password, create_token
 from app.core import database
 from app.core.exceptions import AuthError, RateLimitError, UnifiedPlatformError
-from app.core.unified_platform import get_unified_platform_client
+from app.core.unified_platform import UnifiedPlatformClient, get_unified_platform_client
 from app.core.token_cache import get_token_cache
 from app.schemas.common import (
     SendCodeRequest, RegisterRequest, VerifyLoginRequest,
@@ -26,6 +26,22 @@ router = APIRouter()
 
 _send_code_timestamps: dict[str, float] = {}
 _SEND_CODE_INTERVAL = 60.0
+
+
+async def _cache_platform_session(result: dict) -> None:
+    """平台登录成功后立即缓存用户身份。
+
+    统一平台的 verify-token 端点不可用，若不在此处写入缓存，
+    用户登录成功后 dashboard 的每个接口都会触发平台校验失败。
+    """
+    if not isinstance(result, dict):
+        return
+    token = result.get("token")
+    user = result.get("user")
+    if not token or not isinstance(user, dict):
+        return
+    ttl = UnifiedPlatformClient.jwt_ttl(token)
+    await get_token_cache().set(token, user, ttl=ttl)
 
 
 class LoginRequest(BaseModel):
@@ -81,6 +97,7 @@ async def send_code(req: SendCodeRequest):
 async def register(req: RegisterRequest):
     client = get_unified_platform_client()
     result = await client.register(req.email, req.code, req.password, req.nickname)
+    await _cache_platform_session(result)
     return {"code": 0, "message": "ok", "data": result}
 
 
@@ -88,6 +105,7 @@ async def register(req: RegisterRequest):
 async def verify_login(req: VerifyLoginRequest):
     client = get_unified_platform_client()
     result = await client.verify_login(req.email, req.code)
+    await _cache_platform_session(result)
     return {"code": 0, "message": "ok", "data": result}
 
 
@@ -102,6 +120,7 @@ async def reset_password(req: ResetPasswordRequest):
 async def platform_login(req: PlatformLoginRequest):
     client = get_unified_platform_client()
     result = await client.login(req.email, req.password)
+    await _cache_platform_session(result)
     return {"code": 0, "message": "ok", "data": result}
 
 
