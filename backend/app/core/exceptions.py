@@ -115,10 +115,20 @@ class PlatformUnsupportedError(ParamError):
 
 
 class UnifiedPlatformError(AppException):
-    """统一平台调用失败/超时/不可用（spec 4.3.2）。"""
+    """统一平台服务不可用/超时/网络异常（spec 4.3.2）。503 表示"稍后重试"有意义。"""
 
     def __init__(self, message: str = "统一平台服务不可用，请稍后重试", code: int = 6003, http_status: int = 503):
         super().__init__(code, message, http_status)
+
+
+class UnifiedPlatformBizError(UnifiedPlatformError):
+    """统一平台业务校验失败（验证码错误、邮箱已存在、密码错误等）。
+
+    这不是服务故障，重试同一请求不会有结果，必须返回 4xx 让前端展示具体原因。
+    """
+
+    def __init__(self, message: str = "统一平台校验失败", code: int = 6005, http_status: int = 400):
+        super().__init__(message, code, http_status)
 
 
 class ApiKeyInvalidError(AuthError):
