@@ -15,6 +15,11 @@ export default function Login() {
   const [sendLoading, setSendLoading] = useState(false);
   const [form] = Form.useForm();
 
+  const needCode = mode === 'code' || mode === 'register' || mode === 'reset';
+  const showPassword = mode === 'password' || mode === 'register';
+  const showNewPassword = mode === 'reset';
+  const showNickname = mode === 'register';
+
   useEffect(() => {
     if (countdown <= 0) return;
     const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
@@ -39,6 +44,10 @@ export default function Login() {
   };
 
   const onFinish = async (values: any) => {
+    if (needCode && !values.code) {
+      message.warning('请输入验证码');
+      return;
+    }
     setLoading(true);
     try {
       if (mode === 'admin_local') {
@@ -80,7 +89,13 @@ export default function Login() {
         setMode('password');
         form.resetFields(['code', 'new_password', 'nickname']);
       }
-    } catch {
+    } catch (err: any) {
+      const detail = String(err?.response?.data?.message || err?.message || '');
+      if (mode === 'register' && /已注册|已存在|重复/.test(detail)) {
+        form.setFieldsValue({ email: values.email, password: undefined });
+        setMode('password');
+        message.warning('该邮箱已注册，已切换到密码登录');
+      }
     } finally {
       setLoading(false);
     }
@@ -110,20 +125,17 @@ export default function Login() {
       );
     }
 
-    const showCode = mode === 'code' || mode === 'register' || mode === 'reset';
-    const showPassword = mode === 'password' || mode === 'register';
-    const showNewPassword = mode === 'reset';
-    const showNickname = mode === 'register';
-
     return (
       <Form form={form} onFinish={onFinish} layout="vertical">
         <Form.Item name="email" label="邮箱" rules={[{ required: true, message: '请输入邮箱' }, { type: 'email', message: '邮箱格式不正确' }]}>
           <Input placeholder="请输入邮箱" />
         </Form.Item>
-        {showCode && (
-          <Form.Item name="code" label="验证码" rules={[{ required: true, message: '请输入验证码' }]}>
+        {needCode && (
+          <Form.Item label="验证码" required>
             <Input.Group compact>
-              <Input style={{ width: '60%' }} placeholder="验证码" />
+              <Form.Item name="code" noStyle>
+                <Input style={{ width: '60%' }} placeholder="请输入验证码" maxLength={6} />
+              </Form.Item>
               <Button
                 style={{ width: '40%' }}
                 disabled={countdown > 0}
