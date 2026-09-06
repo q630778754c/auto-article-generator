@@ -55,7 +55,8 @@ client.interceptors.response.use(
       }
     }
     if (error.response?.status === 503) {
-      message.error('认证服务暂时不可用，请稍后重试');
+      // 503 也可能是认证平台返回的具体业务原因，必须透出真实消息
+      message.error(error.response?.data?.message || '认证服务暂时不可用，请稍后重试');
     } else if (error.response?.status === 429) {
       const msg = error.response?.data?.message || '请求过于频繁，请稍后重试';
       message.error(msg);
