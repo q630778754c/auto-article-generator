@@ -9,7 +9,12 @@ import logging
 
 from fastapi import Depends, Header, Request
 
-from app.core.exceptions import AuthError, InvalidTokenError, UnifiedPlatformError
+from app.core.exceptions import (
+    AuthError,
+    InvalidTokenError,
+    UnifiedPlatformBizError,
+    UnifiedPlatformError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +42,13 @@ async def get_current_user(authorization: str | None = Header(default=None)) -> 
     client = get_unified_platform_client()
     try:
         user_info = await client.verify_token(token)
+    except UnifiedPlatformBizError:
+        # 平台不支持用户态 token 校验（/verify-token 恒 401），降级为本地解码。
+        # 否则平台注册用户登录后，dashboard 每个接口都会 503。
+        user_info = client.decode_platform_jwt(token)
+        if not user_info:
+            raise InvalidTokenError("登录已失效，请重新登录")
+        logger.info("verify_token 不可用，已降级本地解码平台 JWT email=%s", user_info.get("email"))
     except UnifiedPlatformError:
         raise
     except Exception as exc:
