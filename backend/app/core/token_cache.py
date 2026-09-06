@@ -40,12 +40,13 @@ class TokenCache:
             self._store.move_to_end(key)
             return entry["user_info"]
 
-    async def set(self, token: str, user_info: dict[str, Any]) -> None:
+    async def set(self, token: str, user_info: dict[str, Any], ttl: int | None = None) -> None:
         key = self._hash_token(token)
+        expire_in = self._ttl if ttl is None else ttl
         async with self._lock:
             if key in self._store:
                 self._store.move_to_end(key)
-            self._store[key] = {"user_info": user_info, "expire_at": time.monotonic() + self._ttl}
+            self._store[key] = {"user_info": user_info, "expire_at": time.monotonic() + expire_in}
             while len(self._store) > self._capacity:
                 self._store.popitem(last=False)
 
