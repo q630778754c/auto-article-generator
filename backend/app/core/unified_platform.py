@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 from typing import Any
@@ -12,7 +13,7 @@ from typing import Any
 import httpx
 
 from app.core.config import get_settings
-from app.core.exceptions import UnifiedPlatformError
+from app.core.exceptions import UnifiedPlatformBizError, UnifiedPlatformError
 
 logger = logging.getLogger(__name__)
 
@@ -57,9 +58,8 @@ class UnifiedPlatformClient:
         elapsed_ms = int((time.monotonic() - start) * 1000)
         logger.info("unified_platform POST %s status=%d elapsed=%dms", path, resp.status_code, elapsed_ms)
         if resp.status_code != 200:
-            body_preview = resp.text[:500]
-            logger.error("unified_platform POST %s status=%d body=%s app_id=%s", path, resp.status_code, body_preview, "SET" if self._app_id else "EMPTY")
-            raise UnifiedPlatformError(f"统一平台返回非 200：{resp.status_code}，详情：{body_preview}")
+            logger.error("unified_platform POST %s status=%d body=%s app_id=%s", path, resp.status_code, resp.text[:500], "SET" if self._app_id else "EMPTY")
+            self._raise_for_status(resp)
         data = resp.json()
         if not isinstance(data, dict):
             raise UnifiedPlatformError("统一平台响应格式异常")
@@ -83,13 +83,80 @@ class UnifiedPlatformClient:
         elapsed_ms = int((time.monotonic() - start) * 1000)
         logger.info("unified_platform GET %s status=%d elapsed=%dms", path, resp.status_code, elapsed_ms)
         if resp.status_code != 200:
-            body_preview = resp.text[:500]
-            logger.error("unified_platform GET %s status=%d body=%s app_id=%s", path, resp.status_code, body_preview, "SET" if self._app_id else "EMPTY")
-            raise UnifiedPlatformError(f"统一平台返回非 200：{resp.status_code}，详情：{body_preview}")
+            logger.error("unified_platform GET %s status=%d body=%s app_id=%s", path, resp.status_code, resp.text[:500], "SET" if self._app_id else "EMPTY")
+            self._raise_for_status(resp)
         data = resp.json()
         if not isinstance(data, dict):
             raise UnifiedPlatformError("统一平台响应格式异常")
         return data
+
+    @staticmethod
+    def _platform_message(text: str) -> str:
+        """从统一平台响应体提取人类可读的错误消息。
+
+        平台错误体形如 {"success":false,"message":"验证码错误或已过期"}，
+        直接透出原始 JSON 会让前端无法判断真实原因。
+        """
+        try:
+            obj = json.loads(text)
+            if isinstance(obj, dict):
+                for key in ("message", "detail", "error"):
+                    val = obj.get(key)
+                    if isinstance(val, str) and val.strip():
+                        return val.strip()
+        except (ValueError, TypeError):
+            pass
+        return text.strip()[:200] or "未知错误"
+
+    @staticmethod
+    def decode_platform_jwt(token: str) -> dict[str, Any] | None:
+        """解码统一平台 JWT（HS256 自包含）并校验 exp，返回 payload 或 None。
+
+        统一平台不提供 token 校验端点（/verify-token 恒返回 401 未授权），
+        只能本地解码 payload 提取用户身份。无法校验签名，属于已知妥协：
+        攻击者可伪造结构合法但无法获得平台写权限的 token。
+        """
+        import base64
+        import binascii
+
+        parts = token.split(".")
+        if len(parts) != 3:
+            return None
+
+        def _b64(seg: str) -> bytes:
+            return base64.urlsafe_b64decode(seg + "=" * (-len(seg) % 4))
+
+        try:
+            payload = json.loads(_b64(parts[1]))
+        except (ValueError, TypeError, binascii.Error):
+            return None
+        if not isinstance(payload, dict):
+            return None
+        exp = payload.get("exp")
+        if isinstance(exp, (int, float)) and time.time() > float(exp):
+            return None
+        if not (payload.get("email") or payload.get("id")):
+            return None
+        return payload
+
+    @staticmethod
+    def jwt_ttl(token: str) -> int | None:
+        """平台 JWT 剩余有效期（秒），解析失败返回 None。"""
+        payload = UnifiedPlatformClient.decode_platform_jwt(token)
+        if not payload:
+            return None
+        exp = payload.get("exp")
+        if not isinstance(exp, (int, float)):
+            return None
+        return max(60, int(float(exp) - time.time()))
+
+    @staticmethod
+    def _raise_for_status(resp: httpx.Response) -> None:
+        """按 HTTP 状态码分级抛错：4xx 是业务校验失败，5xx 才是服务故障。"""
+        detail = UnifiedPlatformClient._platform_message(resp.text)
+        if 400 <= resp.status_code < 500:
+            raise UnifiedPlatformBizError(f"认证平台返回：{detail}")
+        raise UnifiedPlatformError(f"认证平台服务异常（HTTP {resp.status_code}）：{detail}")
 
     @staticmethod
     def _check_success(data: dict[str, Any]) -> dict[str, Any]:
@@ -102,7 +169,9 @@ class UnifiedPlatformClient:
             return data.get("data", data)
         if "成功" in msg or "success" in msg.lower() or "ok" == msg.lower():
             return data.get("data", data)
-        raise UnifiedPlatformError(msg or "统一平台操作失败")
+        # HTTP 200 但业务失败（如 {"success":false,"message":"邮箱已注册"}）：
+        # 必须当业务错误处理，否则会被前端当成"服务不可用"而丢失真实原因。
+        raise UnifiedPlatformBizError(msg or "认证平台校验失败")
 
     async def send_code(self, email: str) -> dict[str, Any]:
         data = await self._post("/send-code", {"email": email})
